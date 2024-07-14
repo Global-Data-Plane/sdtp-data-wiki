@@ -1,0 +1,34 @@
+<!doctype html>
+<title>{% block title %}{% endblock %} - Data Plane</title>
+<!--
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+-->
+
+<h1>Data Plane Table {{ table.name }} with Filter {{ filter }} </h1>
+<table>
+  <tr>
+    {% for column in table.columns %}
+      <th>{{ column.name }} </th>
+    {% endfor %}
+  </tr>
+  <tr>
+    {% for column in table.columns %}
+      <th>{{ column.type }} </th>
+    {% endfor %}
+  </tr>
+  {% for row in table.rows %}
+    <tr>
+      {% for entry in row %}
+        <td> {{ entry }} </td>
+      {% endfor %}
+
+    </tr>
+  {% endfor %}
+</table>
+<br>
+<form action="/view_table">
+  <label for="filter">Filter:</label><br>
+  <input type="text" id="filter" name="filter" value=""><br>
+  <input type="hidden" id="table" name="table" value="{{ table.name }}"><br><br>
+  <input type="submit" value="Submit">
+</form>

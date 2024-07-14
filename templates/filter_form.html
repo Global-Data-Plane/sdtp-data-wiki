@@ -1,0 +1,8 @@
+<h1>Display Table {{table}}</h1>
+Columns: {{ columns }} <br>
+<form action="/display_input">
+  <label for="filter">Filter:</label><br>
+  <input type="text" id="filter" name="filter" value=""><br>
+  <input type="hidden" id="table" name="table" value="{{table}}"><br><br>
+  <input type="submit" value="Submit">
+</form>
