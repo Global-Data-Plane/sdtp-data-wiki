@@ -119,30 +119,28 @@ class SDTPServer(Blueprint):
 
         '''
         settings = config.keys()
-        self.stdp_path = config['stdp_path'] if 'stdp_path' in settings else [os.path.join(os.getcwd(), 'tables')]
+        self.sdtp_path = config['sdtp_path'] if 'sdtp_path' in settings else [os.path.join(os.getcwd(), 'tables')]
         self.additional_routes = config['additional_routes'] if 'additional_routes' in settings else []
         if 'additional_factories' in settings:
             for factory_spec in config['additional_factories']:
                 if _valid_factory_spec(factory_spec):
                     self.table_server.add_table_factory(factory_spec[0], factory_spec[1])
-        self.init_tables(self.stdp_path)
+        self.init_tables()
 
 
-    def init_tables(self, paths = None):
+    def init_tables(self):
         '''
         Initialize the TableServer, reading files from the directories in the 
         paths parameter.  If paths is None, reads the list of paths from the
         SDTP_PATH variable in the environment.  To initialize with no tables,
         just pass an empty list
-        Parameters:
-            paths: the list of paths to check for tables
+       
         Returns:
             a JSON dump of the tables
         '''
         self.table_server = TableServer()
-        if paths is None:
-            paths = SDTP_PATH
-        paths = [path for path in paths if os.path.isdir(path)]
+        
+        paths = [path for path in self.sdtp_path if os.path.isdir(path)]
         for path in paths:
             files = glob(f'{path}/*.json')
             for filename in files:

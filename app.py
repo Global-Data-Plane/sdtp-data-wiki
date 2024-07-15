@@ -81,8 +81,8 @@ def view_table():
 
 
 
-UPLOAD_FOLDER = '/workspaces/sdtp-data-wiki/uploads'
-TABLE_FOLDER =  '/workspaces/sdtp-data-wiki/tables'
+UPLOAD_FOLDER = '/tmp'
+
 
 from uploader import UploadedFile
 
@@ -107,13 +107,13 @@ def upload_file():
             new_table = upload_info.convert(saved_file)
             if new_table:
                 table_name = upload_info.base
-                stored_table = Table(new_table)
-                sdtp_server_blueprint.table_server.add_sdtp_table({"name": table_name, "table": stored_table})
-                table_file_name = os.path.join(TABLE_FOLDER, upload_info.table_filename())
+                table_file_name = os.path.join(sdtp_server_blueprint.sdtp_path[0], upload_info.table_filename())
                 with open(table_file_name, "w") as table_file:
                     table_descriptor = new_table.to_dictionary()
                     full_descriptor = {"name": table_name, "table": table_descriptor}
                     dump(full_descriptor, table_file)
+                stored_table = Table(new_table)
+                sdtp_server_blueprint.table_server.add_sdtp_table({"name": table_name, "table": stored_table})
                 return redirect(f'/view_table?table={table_name}')
             else:
                 return f'bad file type {upload_info.type}'
@@ -125,15 +125,17 @@ def view_tables():
     table_names = sdtp_server_blueprint.table_server.servers.keys()
     return render_template('view_tables.html', tables=table_names)
 
+
+
+sdtp_server_blueprint.configure({
+    'sdtp_path': [os.path.join(os.getcwd(), 'tables')],
+    'additional_routes': [
+        {"url": "/upload", "method": ["GET", "POST"], "description": "File uploader.  If a multipart file is not attached to the POST body, displays a file chooser"},
+        {"url": "/view_tables", "method": ["GET"], "description": "Shows all the tables in a list, with a link to the table viewer method"},
+        {"url": "/view_table?table<i>string, required</i>&filter<i>string, optional</i>", "method": ["GET", "POST"], "description": "Table Viewer.  Displays the first twenty rows of the table (filtered, if filter was applied).  filter, if present is a functional filter expression, e.g. IN_RANGE('<column_name>, <min_val>, <max_val>)"}
+    ],
+    'additional_factories': [] # if present, should be a list of the form (<type>, <factory_instance>)
+})
+
 if __name__ == '__main__':
-    sdtp_server_blueprint.configure({
-        'stdp_path': [os.path.join(os.getcwd(), 'tables')],
-        'additional_routes': [
-            {"url": "/upload", "method": ["GET", "POST"], "description": "File uploader.  If a multipart file is not attached to the POST body, displays a file chooser"},
-            {"url": "/view_tables", "method": ["GET"], "description": "Shows all the tables in a list, with a link to the table viewer method"},
-            {"url": "/view_table?table<i>string, required</i>&filter<i>string, optional</i>", "method": ["GET", "POST"], "description": "Table Viewer.  Displays the first twenty rows of the table (filtered, if filter was applied).  filter, if present is a functional filter expression, e.g. IN_RANGE('<column_name>, <min_val>, <max_val>)"}
-        ],
-        'additional_factories': [] # if present, should be a list of the form (<type>, <factory_instance>)
-    })
-    
-    app.run()
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
