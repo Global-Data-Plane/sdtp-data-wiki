@@ -125,14 +125,17 @@ def view_tables():
     table_names = sdtp_server_blueprint.table_server.servers.keys()
     return render_template('view_tables.html', tables=table_names)
 
-
+@app.route("/view_base")
+def view_base():
+    return render_template('base.html')
 
 sdtp_server_blueprint.configure({
     'sdtp_path': [os.path.join(os.getcwd(), 'tables')],
     'additional_routes': [
         {"url": "/upload", "method": ["GET", "POST"], "description": "File uploader.  If a multipart file is not attached to the POST body, displays a file chooser"},
         {"url": "/view_tables", "method": ["GET"], "description": "Shows all the tables in a list, with a link to the table viewer method"},
-        {"url": "/view_table?table<i>string, required</i>&filter<i>string, optional</i>", "method": ["GET", "POST"], "description": "Table Viewer.  Displays the first twenty rows of the table (filtered, if filter was applied).  filter, if present is a functional filter expression, e.g. IN_RANGE('<column_name>, <min_val>, <max_val>)"}
+        {"url": "/view_table?table <i>string, required</i>&filter<i>string, optional</i>", "method": ["GET", "POST"], "description": "Table Viewer.  Displays the first twenty rows of the table (filtered, if filter was applied).  filter, if present is a functional filter expression, e.g. IN_RANGE('<column_name>, <min_val>, <max_val>)"},
+        {"url": "/view_base", "method": ["GET", "POST"], "description": "Check out the base template"}
     ],
     'additional_factories': [] # if present, should be a list of the form (<type>, <factory_instance>)
 })

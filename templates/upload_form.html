@@ -1,11 +1,16 @@
-<html>   
-<head>   
-    <title>Upload XLS/CSV</title>   
-</head>   
-<body>   
+{% extends "base.html" %}
+{% block title %}Uploader{% endblock %}
+{% block head %}
+    {{ super() }}
+    <style type="text/css">
+        .important { color: #336699; }
+    </style>
+{% endblock %}
+{% block content %}
+   <h1>Upload a New Data Plane Table</h1>
     <form action = "/upload" method = "post" enctype="multipart/form-data">   
-        <input type="file" name="file" />   
+        <label for="file">Choose File:</label>
+        <input type="file" name="file" /><br>  
         <input type = "submit" value="Upload">   
     </form>   
-</body>   
-</html>
+{% endblock %}

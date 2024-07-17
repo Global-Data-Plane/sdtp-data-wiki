@@ -1,34 +1,40 @@
-<!doctype html>
-<title>{% block title %}{% endblock %} - Data Plane</title>
-<!--
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
--->
-
-<h1>Data Plane Table {{ table.name }} with Filter {{ filter }} </h1>
-<table>
-  <tr>
-    {% for column in table.columns %}
-      <th>{{ column.name }} </th>
-    {% endfor %}
-  </tr>
-  <tr>
-    {% for column in table.columns %}
-      <th>{{ column.type }} </th>
-    {% endfor %}
-  </tr>
-  {% for row in table.rows %}
-    <tr>
-      {% for entry in row %}
-        <td> {{ entry }} </td>
+{% extends "base.html" %}
+{% block title %}Data Plane Table {{ table.name }} {% endblock %}
+{% block head %}
+    {{ super() }}
+    <style type="text/css">
+        .type { color: #336699; font-family: monospace}
+    </style>
+{% endblock %}
+{% block content %}
+<center>
+  <h1>Data Plane Table<span style = "display: block;"></span>{{ table.name }}<span style = "display: block;"></span> {% if filter|length > 1 %} Filter:  {{ filter }} {% endif %}</h1>
+  <table style="border: 1px solid blue;">
+    <tr style="border: 1px solid blue;">
+      {% for column in table.columns %}
+        <th style="border: 1px solid blue;">{{ column.name }} </th>
       {% endfor %}
-
     </tr>
-  {% endfor %}
-</table>
-<br>
-<form action="/view_table">
-  <label for="filter">Filter:</label><br>
-  <input type="text" id="filter" name="filter" value=""><br>
-  <input type="hidden" id="table" name="table" value="{{ table.name }}"><br><br>
-  <input type="submit" value="Submit">
-</form>
+    <tr style="border: 1px solid blue;">
+      {% for column in table.columns %}
+        <th style="background-color: #336699; font-family: monospace; color: white;">{{ column.type }} </th>
+      {% endfor %}
+    </tr>
+    {% for row in table.rows %}
+      <tr style="border: 1px solid blue;">
+        {% for entry in row %}
+          <td style="border: 1px solid blue;"> {{ entry }} </td>
+        {% endfor %}
+
+      </tr>
+    {% endfor %}
+  </table>
+</center>
+  <br>
+  <form action="/view_table">
+    <label for="filter">Filter:</label><br>
+    <input type="text" style="width:300px;" id="filter" name="filter" value=""><br>
+    <input type="hidden" id="table" name="table" value="{{ table.name }}"><br><br>
+    <input type="submit" value="Submit">
+  </form>
+{% endblock %}
