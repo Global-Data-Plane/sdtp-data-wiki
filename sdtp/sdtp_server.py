@@ -48,7 +48,7 @@ After that, requests for the named table will be served by the created data serv
 import logging
 import os
 from json import JSONDecodeError, loads, load
-from glob import glob
+
 
 import csv
 
@@ -60,38 +60,7 @@ from sdtp import InvalidDataException, convert_row_to_type_list
 from sdtp import RowTable
 from sdtp import check_valid_spec
 from sdtp import TableServer, TableNotFoundException, TableNotAuthorizedException, \
-    ColumnNotFoundException, build_table_spec, Table
-
-
-ROUTES = [
-    {"url": "/, /help", "headers": "", "method": "GET", "description": "print this message"},
-    {"url": "/get_tables", "method": "GET", "headers": "<i>as required for authentication</i>",
-        "description": 'Dumps a JSONIfied dictionary of the form:{table_name: <table_schema>}, where <table_schema> is a dictionary{"name": name, "type": type}'},
-    {"url": "/get_filtered_rows?table_name <i>string, required</i>", "method": "POST",
-        "body": {"table": "<i> required, the name of the table to get the rows from<i/>",
-                "columns": "<i> If  present, a list of the names of the columns to fetch</i>",
-                "filter": "<i> optional, a filter_spec in the SDTP filter language"},
-        "headers": "<i> as required for authentication</i>",
-        "description": "Get the rows from table Table-Name (and, optionally, Dashboard-Name) which match filter Filter-Spec"},
-    {"url": "/get_range_spec?column_name <i>string, required</i>&table_name <i>string, required</i>", "method": "GET",
-        "headers": "<i>as required for authentication</i>",
-        "description": "Get the  minimum, and maximum values for column <i>column_name</i> in table <i>table_name</i>, returned as a dictionary {min_val, max_val}."},
-    {"url": "/get_all_values?column_name <i>string, required</i>&table_name <i>string, required</i>", "method": "GET",
-        "headers": "<i>as required for authentication</i>",
-        "description": "Get all the distinct values for column <i>column_name</i> in table <i>table_name</i>, returned as a sorted list.  Authentication variables should be in headers."},
-    {"url": "/get_table_spec", "method": "GET",
-        "description": "Return the dictionary of table names and authorization variables"},
-    {"url": "/init?path <i>string, optional, multiple</i>", "method": ["GET", "POST"],
-        "description": "Restart the table server and load any initial tables.  Returns the list returned by /get_table_spec"},
-
-]
-
-def _valid_factory_spec(factory_spec):
-    if type(factory_spec) in {list, tuple} and len(factory_spec) == 2:
-        return type(factory_spec[0]) == str and hasattr(factory_spec[1], 'build_table')
-    else:
-        return False
-
+    ColumnNotFoundException, Table
 
 
 class SDTPServer(Blueprint):
@@ -102,52 +71,26 @@ class SDTPServer(Blueprint):
     def __init__(self, name, __name__):
         super(SDTPServer, self).__init__(name, __name__)
         self.table_server = TableServer()
+        self.ROUTES = [
+            {"url": "/get_tables", "method": "GET", "headers": "<i>as required for authentication</i>",
+                "description": 'Dumps a JSONIfied dictionary of the form:{table_name: <table_schema>}, where <table_schema> is a dictionary{"name": name, "type": type}'},
+            {"url": "/get_filtered_rows?table_name <i>string, required</i>", "method": "POST",
+                "body": {"table": "<i> required, the name of the table to get the rows from<i/>",
+                        "columns": "<i> If  present, a list of the names of the columns to fetch</i>",
+                        "filter": "<i> optional, a filter_spec in the SDTP filter language"},
+                "headers": "<i> as required for authentication</i>",
+                "description": "Get the rows from table Table-Name (and, optionally, Dashboard-Name) which match filter Filter-Spec"},
+            {"url": "/get_range_spec?column_name <i>string, required</i>&table_name <i>string, required</i>", "method": "GET",
+                "headers": "<i>as required for authentication</i>",
+                "description": "Get the  minimum, and maximum values for column <i>column_name</i> in table <i>table_name</i>, returned as a dictionary {min_val, max_val}."},
+            {"url": "/get_all_values?column_name <i>string, required</i>&table_name <i>string, required</i>", "method": "GET",
+                "headers": "<i>as required for authentication</i>",
+                "description": "Get all the distinct values for column <i>column_name</i> in table <i>table_name</i>, returned as a sorted list.  Authentication variables should be in headers."},
+            {"url": "/get_table_spec", "method": "GET",
+                "description": "Return the dictionary of table names and authorization variables"},
+            
+        ]
 
-    def configure(self, config):
-        '''
-        Configure the SDTP Server with three configuration settings, passed in a dictionary:
-        1. sdtp_path: a path of directories to search for tables 
-        2. additional_routes: documentation on any routes added to the standard sdtp routes.  Note that
-        this does not add any routers; the standard @app.route decorator is required for that.  It 
-        does add dictionaries to be added to the dictionaries displayed when the / or /help route is
-        used.  These dictionaries should have three entries:
-            url, the url of the route including parameters;
-            methods, a list of ['GET', 'POST'];
-            description, a short description of the route and what it returns
-        After the SDTP Server is configured, this routing calls self.init_tables, so this initializes the
-        tables as well.
-
-        '''
-        settings = config.keys()
-        self.sdtp_path = config['sdtp_path'] if 'sdtp_path' in settings else [os.path.join(os.getcwd(), 'tables')]
-        self.additional_routes = config['additional_routes'] if 'additional_routes' in settings else []
-        if 'additional_factories' in settings:
-            for factory_spec in config['additional_factories']:
-                if _valid_factory_spec(factory_spec):
-                    self.table_server.add_table_factory(factory_spec[0], factory_spec[1])
-        self.init_tables()
-
-
-    def init_tables(self):
-        '''
-        Initialize the TableServer, reading files from the directories in the 
-        paths parameter.  If paths is None, reads the list of paths from the
-        SDTP_PATH variable in the environment.  To initialize with no tables,
-        just pass an empty list
-       
-        Returns:
-            a JSON dump of the tables
-        '''
-        self.table_server = TableServer()
-        
-        paths = [path for path in self.sdtp_path if os.path.isdir(path)]
-        for path in paths:
-            files = glob(f'{path}/*.json')
-            for filename in files:
-                with open(filename, 'r') as fp:
-                    table_dictionary = load(fp)
-                    self.table_server.add_sdtp_table_from_dictionary(table_dictionary)
-        return self.table_server.get_auth_spec()
 
 sdtp_server_blueprint = SDTPServer('sdtp_server', __name__)
 
@@ -462,37 +405,3 @@ def get_table_spec():
 
     '''
     return jsonify(sdtp_server_blueprint.table_server.get_auth_spec())
-
-
-@sdtp_server_blueprint.route('/init', methods=['POST', 'GET'])
-def init_route():
-    '''
-    Target for the '/init' route.  This is just a front end on the init(paths) method,
-    extracting the paths to check from the parameter list (if present) or the SDTP_PATH
-    environment variable (if set)
-
-    '''
-    request_paths = None
-
-    params = request.args.getlist('paths') or request.form.getlist('paths')
-    if len(params) == 1 and ':' in params[0]:
-        request_paths = params[0].split(':')
-    elif len(params) > 0:
-        request_paths = params
-
-    result = sdtp_server_blueprint.init_tables(request_paths)
-    return jsonify(result)
-
-
-
-@sdtp_server_blueprint.route('/help', methods=['POST', 'GET'])
-@sdtp_server_blueprint.route('/', methods=['POST', 'GET'])
-def show_routes():
-    '''
-    Show the API for the table server
-    Arguments: None
-    '''
-    pages = ROUTES + sdtp_server_blueprint.additional_routes
-    page_strings = [f'<li>{page}</li>' for page in pages]
-
-    return f'<body  style="font-family: Arial, Helvetica, Sans-Serif;"><h1>Supported Methods</h1><ul>{"".join(page_strings)}</ul></body>'
