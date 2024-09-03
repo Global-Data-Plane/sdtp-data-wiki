@@ -32,23 +32,62 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from flask import  Flask, request, render_template, flash, redirect
+from flask import  Flask, request, render_template, flash, redirect, url_for, session
 
 import sys
 import os
-from json import dump, load
-from glob import glob
+from authlib.integrations.flask_client import OAuth
+import jwt
+from uploader import make_SDMLTable_from_upload
 
-sys.path.append('.')
-# sys.path.append('./data_plane')
-from sdtp import sdtp_server_blueprint, Table
+
+from sdtp import sdtp_server_blueprint
+from wiki_server import wiki_server, show_root
 app = Flask(__name__)
+
+app.register_blueprint(wiki_server)
 
 app.register_blueprint(sdtp_server_blueprint)
 
 # from google.cloud import bigquery
 
+app.secret_key = 'your_secret_key_here'
+# root = 'https://data-plane-428318.uw.r.appspot.com/'
+root = 'http://localhost:8080'
 
+# Configure OAuth
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id='561711661897-0dknrvipunasphilaa5ilu9g0o7qrgqn.apps.googleusercontent.com',
+    client_secret='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',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    redirect_uri=f'{root}/oauth2callback',
+    client_kwargs={'scope': 'email'},
+    server_metadata_url = 'https://accounts.google.com/.well-known/openid-configuration'
+)
+
+@app.route('/login')
+def login():
+    redirect_uri = url_for('authorize', _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+@app.route('/oauth2callback')
+def authorize():
+    try:
+        # Exchange the authorization code for an access token
+        token = google.authorize_access_token()
+        
+        id_token = token.get('id_token')
+        user_info = jwt.decode(id_token, options={"verify_signature": False})
+        email = user_info.get('email')
+        session['email'] = email
+        session['user'] = email.split('@')[0]
+        return show_root()
+    except Exception as e:
+        # Capture and return the error message
+        return f'Error: {str(e)}'
 # client = bigquery.Client()
 
 @app.route('/cwd')
@@ -56,7 +95,7 @@ def cwd():
     return os.getcwd()
 
 from build_filter import create_filter    
-from sdtp import check_valid_spec_return_boolean
+from sdtp import check_valid_spec_return_boolean, InvalidDataException
 
 @app.route('/view_table')
 def view_table():
@@ -68,7 +107,7 @@ def view_table():
         sdtp_filter_spec = None
         filter = ''
 
-    rows =   table.get_filtered_rows(sdtp_filter_spec)
+    rows = table.get_filtered_rows(sdtp_filter_spec)
     if len(rows) > 20: rows = rows[:20]
     return render_template('table.html',
                            filter = filter if filter is not None else '',
@@ -76,27 +115,27 @@ def view_table():
                                "name": table_name, "columns": table.schema, "rows": rows
                             })
 
+from conf import BUCKET_NAME
+
+from gcs_interface import SDMLStorageBucket
+
+bucket = SDMLStorageBucket(BUCKET_NAME)
+
+def _check_email():
+    # A  utility to ensure that only registered users 
+    # can upload files
+    return 'email' in session and session['email'].endswith('berkeley.edu')
+
+def upload_error(message):
+    flash(message)
+    return redirect(request.url)
 
 
-from conf import UPLOAD_FOLDER, TABLE_FACTORIES, SDTP_PATH
-
-UPLOAD_FOLDER = '/tmp'
-
-MAIN_TABLE_STORE = SDTP_PATH[0] if SDTP_PATH is not None and len(SDTP_PATH) > 0 else None
-
-
-from uploader import UploadedFile
-
-def _store_table(new_table, table_name, dir):
-    table_file_name = os.path.join(dir, table_name)
-    with open(table_file_name, "w") as table_file:
-        table_descriptor = new_table.to_dictionary()
-        full_descriptor = {"name": table_name, "table": table_descriptor}
-        dump(full_descriptor, table_file)
-
-    
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
+    if not _check_email():
+        flash('Uploads restricted to individuals with a berkeley.edu account')
+        return show_root()
     if request.method == 'POST':
         # check if the post request has the file part
         if 'file' not in request.files:
@@ -108,25 +147,22 @@ def upload_file():
         if file.filename == '':
             # flash('No selected file')
             return redirect(request.url)
-        upload_info = UploadedFile(file.filename)
-        if  upload_info.type:
-            saved_file = os.path.join(UPLOAD_FOLDER, upload_info.safe_filename())
-            file.save(saved_file)
-            new_table = upload_info.convert(saved_file)
-            if new_table:
-                table_name = upload_info.base
-                if MAIN_TABLE_STORE:
-                    _store_table(new_table, upload_info.table_filename(), MAIN_TABLE_STORE)
-                # table_file_name = os.path.join(sdtp_server_blueprint.sdtp_path[0], upload_info.table_filename())
-                # with open(table_file_name, "w") as table_file:
-                #     table_descriptor = new_table.to_dictionary()
-                #     full_descriptor = {"name": table_name, "table": table_descriptor}
-                #     dump(full_descriptor, table_file)
-                stored_table = Table(new_table)
-                sdtp_server_blueprint.table_server.add_sdtp_table({"name": table_name, "table": stored_table})
-                return redirect(f'/view_table?table={table_name}')
-            else:
-                return f'bad file type {upload_info.type}'
+        # make_SDMLTable_from_upload checks to maek sure it's an SDML file
+        try:
+            table_types = set(sdtp_server_blueprint.table_server.factories.keys())
+            table_dictionary = make_SDMLTable_from_upload(request.files['file'], table_types)  
+        except InvalidDataException as e:
+            flash(str(e))
+            return redirect(request.url)
+        try:
+            table_dictionary["name"] = f"{session['user']}/{table_dictionary['name']}"
+            sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(table_dictionary["name"], table_dictionary["table"])
+        except InvalidDataException as e:
+            return upload_error(f'Error {e} in creating the table for  {file.filename}')
+        bucket.upload_table(table_dictionary)
+        return redirect(f"/view_table?table={table_dictionary['name']}")
+        
+       
     return render_template('upload_form.html')
     
 
@@ -163,37 +199,10 @@ def show_routes():
     return render_template('routes.html', pages = pages, keys = keys)
 
 
-
-#
-# Load any TABLE_FACTORIES before loading any tables, so nonstandard table types are recognized.
-# Very simple: just check to make sure that each item in TABLE_FACTORIES is keyed by a string
-# and the value is a genuine TableFactory class
-#
-
-if TABLE_FACTORIES is not None and type(TABLE_FACTORIES) == dict:
-    for (table_type, factory) in TABLE_FACTORIES.items():
-        if type(table_type == str) and hasattr(factory, 'build_table'):
-            sdtp_server_blueprint.table_server.add_table_factory(table_type, factory)
-
-#
-# Load a table.  filename is a valid path and a JSON file.
-# 
-
-def _load_table(filename):
-    with open(filename, 'r') as fp:
-        table_dictionary = load(fp)
-        sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(table_dictionary)
-
-# 
-# Load all the tables on SDTP_PATH.  
-#
-
-if SDTP_PATH is not None and len(SDTP_PATH) > 0:
-    for path in SDTP_PATH:
-        if os.path.exists(path) and os.path.isdir(path):
-            files = glob(f'{path}/*.json')
-            for filename in files:
-                _load_table(filename)
+table_names = bucket.get_all_table_names()
+for table_name in table_names:
+    table_dict = bucket.get_table_as_dictionary(table_name)
+    sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(table_name, table_dict)
 
 
 if __name__ == '__main__':

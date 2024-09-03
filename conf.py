@@ -12,7 +12,8 @@ It contains three  variables:
 3. UPLOAD_FOLDER A folder for uploaded files.  The CSV and XLSX conversion methods rely on pandas, and pandas reads CSV/XLS files, 
    not MIME byte streams.  So we need a place to temporarily store these files. 
 '''
-import os
-UPLOAD_FOLDER = '/tmp'
-SDTP_PATH = [os.path.join(os.getcwd(), 'tables')]
+BUCKET_NAME = 'berkeley_data_plane_wiki'
 TABLE_FACTORIES = {}
+
+import os
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:\\Users\\rick\\.google_keys\\data-plane-428318-efcc7245166a.json"

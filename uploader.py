@@ -1,49 +1,43 @@
 import pandas as pd
-from sdtp import DataFrameTable
+from sdtp import SDMLTable, InvalidDataException
+from pathlib import Path
+import json
 
-ALLOWED_EXTENSIONS = {'csv': 'csv',  'xls': 'excel', 'xlsx': 'excel'}
-from werkzeug.utils import secure_filename
 
-def _clean_row(row):
-  return [s.strip() if type(s) == str else s for s in row]
+def make_SDMLTable_from_upload(uploaded_file, valid_table_types):
+  '''
+  Make an SDMLTable with a name from uploaded_file, which
+  is a FileStorage object from a Flask request object (see
+  https://tedboy.github.io/flask/generated/generated/werkzeug.FileStorage.html)
+  Returns a dictionary, {"name", "table"}, where name is the name of the file
+  and table is the dictionary form of the SDML Table.  Throws an exception if this isn't a valid
+  SDML Table.
+  Arguments:
+    uploaded_file: an instance of werkzeug.FileStorage
+    valid_table_types: a set of table types that can be realized
 
-def _convert_dataframe(df):
-  all_rows = df.values.tolist()
-  rows = [_clean_row(r) for r in all_rows[1:]]
-  types = _clean_row(all_rows[0])
-  schema = [{"name": df.columns[i], "type": types[i]} for i in range(len(types))]
-  df2 = pd.DataFrame(rows, columns=df.columns)
-  return DataFrameTable(schema, df2)
+  '''
+  # Error check -- is the file extension .sdml?
+  filename = uploaded_file.filename
+  if Path(filename).suffix.lower() != '.sdml':
+    raise InvalidDataException(f'{filename} must be an SDML file, with a .sdml extension')
 
-def convert_excel(excel_file):
-  df = pd.read_excel(excel_file)
-  return _convert_dataframe(df)
-
-def convert_csv(csv_file):
-  df = pd.read_csv(csv_file)
-  return _convert_dataframe(df)
-
-class UploadedFile:
-    def __init__(self, filename):
-        try:
-            parts = filename.rsplit('.', 1)
-            self.suffix = parts[1]
-            self.base = parts[0]
-            key = parts[1].lower()
-            self.type = ALLOWED_EXTENSIONS[key] if key in ALLOWED_EXTENSIONS.keys() else None
-        except Exception:
-            self.suffix = self.base = self.type = None
-    
-    def table_filename(self):
-        return secure_filename(f'{self.base}.json')
-    
-    def safe_filename(self):
-        return secure_filename(f'{self.base}.{self.suffix}')
-    
-    def convert(self, filename):
-        if self.type == 'csv':
-            return convert_csv(filename)
-        elif self.type == 'excel':
-            return convert_excel(filename)
-        else:
-            return None
+  # is the uploaded file's contents a JSON dictionary?
+  contents = uploaded_file.read()
+  try:
+    sdml_form = json.loads(contents)
+  except json.JSONDecodeError as e:
+    raise InvalidDataException(f'JSON Decode Error {str(e)} when reading {filename}')
+  
+  # Does the dictionary contain schema and type?
+  if type(sdml_form) != dict:
+    raise InvalidDataException(f'{filename} is not a dictionary')
+  required_keys = {'schema', 'type'}
+  missing_keys = set(required_keys) - set(sdml_form.keys())
+  if len(missing_keys) > 0:
+    raise InvalidDataException(f'{filename} is missing {missing_keys}')
+  if not (sdml_form["type"] in valid_table_types):
+    raise InvalidDataException(f'The table type of {filename} is {sdml_form["type"]}.  Valid types are {valid_table_types}')
+  
+  # Make the UploadedSDMLTable with name and dictionary
+  return {"name": Path(filename).stem, "table": sdml_form}

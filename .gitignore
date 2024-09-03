@@ -165,3 +165,5 @@ tables
 uploads
 tmp
 .gcloud
+app_test_upload.py
+conf.py

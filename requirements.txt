@@ -21,6 +21,7 @@ openpyxl==3.1.5
 packaging
 pandas
 pluggy
+pyjwt
 pyOpenSSL
 PySocks
 python-dateutil==2.9.0
@@ -34,3 +35,10 @@ tzdata==2024.1
 urllib3
 Werkzeug==3.0.3
 zstandard
+Flask
+gunicorn
+Werkzeug
+Authlib
+google-cloud-storage
+google-cloud-core
+sdtp
