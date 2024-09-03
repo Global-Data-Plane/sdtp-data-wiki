@@ -167,3 +167,5 @@ tmp
 .gcloud
 app_test_upload.py
 conf.py
+replacements.txt
+app_copy.py
