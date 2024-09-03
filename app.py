@@ -55,12 +55,13 @@ app.secret_key = 'your_secret_key_here'
 # root = 'https://data-plane-428318.uw.r.appspot.com/'
 root = 'http://localhost:8080'
 
+from conf import client_id, client_secret
 # Configure OAuth
 oauth = OAuth(app)
 google = oauth.register(
     name='google',
-    client_id='561711661897-0dknrvipunasphilaa5ilu9g0o7qrgqn.apps.googleusercontent.com',
-    client_secret='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',
+    client_id=client_id,
+    client_secret=client_secret,
     authorize_url='https://accounts.google.com/o/oauth2/auth',
     access_token_url='https://accounts.google.com/o/oauth2/token',
     redirect_uri=f'{root}/oauth2callback',

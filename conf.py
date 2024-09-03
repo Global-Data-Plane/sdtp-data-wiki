@@ -17,3 +17,5 @@ TABLE_FACTORIES = {}
 
 import os
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:\\Users\\rick\\.google_keys\\data-plane-428318-efcc7245166a.json"
+client_id='561711661897-0dknrvipunasphilaa5ilu9g0o7qrgqn.apps.googleusercontent.com'
+client_secret='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'
