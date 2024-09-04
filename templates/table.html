@@ -8,7 +8,8 @@
 {% endblock %}
 {% block content %}
 <center>
-  <h1>Data Plane Table<span style = "display: block;"></span>{{ table.name }}<span style = "display: block;"></span> {% if filter|length > 1 %} Filter:  {{ filter }} {% endif %}</h1>
+  <h1>Data Plane Table<span style = "display: block;"></span>{{ table.name }}<span style = "display: block;"></span> </h1>
+  {% if filter|length > 1 %} <p>Filter:  {{ filter }}</p> {% endif %}
   <table style="border: 1px solid blue;">
     <tr style="border: 1px solid blue;">
       {% for column in table.columns %}
@@ -31,9 +32,12 @@
   </table>
 </center>
   <br>
+  <p>Enter a filter in <a href="https://github.com/rickmcgeer/sdtp/blob/main/docs/sdql.md" target = "_blank"> SDQL Format</a></p>
   <form action="/filter_table" method="post">
     <label for="filter">Filter:</label><br>
-    <input type="text" style="width:300px;height:50px" cols="40", rows="5", id="filter" name="filter" value=""><br>
+    <textarea style="width:300px;height:50px" cols="40", rows="5", id="filter" name="filter">
+
+    </textarea>
     <input type="hidden" id="table" name="table" value="{{ table.name }}"><br><br>
     <input type="submit" value="Submit">
   </form>
