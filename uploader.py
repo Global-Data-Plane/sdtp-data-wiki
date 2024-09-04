@@ -1,5 +1,4 @@
-import pandas as pd
-from sdtp import SDMLTable, InvalidDataException
+from sdtp import  InvalidDataException
 from pathlib import Path
 import json
 

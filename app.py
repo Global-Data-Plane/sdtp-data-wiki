@@ -138,6 +138,8 @@ def cwd():
 from build_filter import create_filter    
 from sdtp import check_valid_spec_return_boolean, InvalidDataException
 
+from table_sample_queries import table_sample_queries
+
 def _render_table(table_name, table, rows, filter_spec = None):
     context = {
         "filter": filter_spec if filter_spec is not None else '',
@@ -147,7 +149,10 @@ def _render_table(table_name, table, rows, filter_spec = None):
             "rows": rows[:20] if len(rows) > 20 else rows
         }
     }
+    if table_name in table_sample_queries.keys():
+        context['sample_tables'] = table_sample_queries[table_name]
     return extended_render('table.html', context)
+
 
 @app.route('/filter_table', methods=['POST'])
 def filter_table():
@@ -182,13 +187,7 @@ def view_table():
 
     rows = table.get_filtered_rows()
     return _render_table(table_name, table, rows)
-    if len(rows) > 20: rows = rows[:20]
-    context = {
-        "filter": sdtp_filter_spec if sdtp_filter_spec is not None else '',
-        "columns": table.schema,
-        "rows": rows
-    }
-    return extended_render('table.html', context)
+    
                            
 BUCKET_NAME = os.environ['BUCKET_NAME']
 
