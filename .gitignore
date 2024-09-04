@@ -166,6 +166,9 @@ uploads
 tmp
 .gcloud
 app_test_upload.py
-conf.py
 replacements.txt
 app_copy.py
+
+# don't look at secrets in deployment
+app.yaml
+.vscode/

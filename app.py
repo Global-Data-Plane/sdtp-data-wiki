@@ -32,18 +32,57 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from flask import  Flask, request, render_template, flash, redirect, url_for, session
+from flask import  Flask, Blueprint, request, render_template, flash, redirect, url_for, session
 
-import sys
 import os
 from authlib.integrations.flask_client import OAuth
 import jwt
 from uploader import make_SDMLTable_from_upload
+from json import loads, JSONDecodeError
 
 
 from sdtp import sdtp_server_blueprint
-from wiki_server import wiki_server, show_root
+
 app = Flask(__name__)
+
+wiki_server = Blueprint('sdtp_wiki_server', __name__, template_folder='templates')
+
+additional_routes =[
+  {"url": "/upload", "method": ["GET", "POST"], "description": "File uploader.  If a multipart file is not attached to the POST body, displays a file chooser"},
+  {"url": "/view_tables", "method": ["GET"], "description": "Shows all the tables in a list, with a link to the table viewer method"},
+  {"url": "/view_table?table <i>string, required</i>&filter<i>string, optional</i>", "method": ["GET", "POST"], "description": "Table Viewer.  Displays the first twenty rows of the table (filtered, if filter was applied).  filter, if present is a functional filter expression, e.g. IN_RANGE('<column_name>, <min_val>, <max_val>)"},
+  {"url": "/view_base", "method": ["GET", "POST"], "description": "Check out the base template"}
+]
+
+
+def extended_render(template_name, context):
+    '''
+    Render the template with context, adding email and user
+    if they are defined in this session
+    Arguments:
+        template_name: name of the template file
+        context: a dictionary of contexts for the template
+    '''
+    if "email" in session.keys():
+        context["email"] = session["email"]
+        context["user"] = session["user"]
+    
+    return render_template(template_name, **context)
+
+@wiki_server.route('/')
+def show_root():
+  '''
+  Show the API for the table server
+  Arguments: None
+  '''
+  
+  context = {
+      "routes": sdtp_server_blueprint.ROUTES,
+      "table_names": list(sdtp_server_blueprint.table_server.servers.keys()),
+      "additional_routes": additional_routes
+  }
+  return extended_render('greeting.html', context)
+  
 
 app.register_blueprint(wiki_server)
 
@@ -51,23 +90,24 @@ app.register_blueprint(sdtp_server_blueprint)
 
 # from google.cloud import bigquery
 
-app.secret_key = 'your_secret_key_here'
+app.secret_key = os.environ["APP_SECRET"]
 # root = 'https://data-plane-428318.uw.r.appspot.com/'
 root = 'http://localhost:8080'
+import os
 
-from conf import client_id, client_secret
 # Configure OAuth
 oauth = OAuth(app)
 google = oauth.register(
     name='google',
-    client_id=client_id,
-    client_secret=client_secret,
+    client_id=os.environ['CLIENT_ID'],
+    client_secret=os.environ['CLIENT_SECRET'],
     authorize_url='https://accounts.google.com/o/oauth2/auth',
     access_token_url='https://accounts.google.com/o/oauth2/token',
     redirect_uri=f'{root}/oauth2callback',
     client_kwargs={'scope': 'email'},
     server_metadata_url = 'https://accounts.google.com/.well-known/openid-configuration'
 )
+
 
 @app.route('/login')
 def login():
@@ -98,25 +138,59 @@ def cwd():
 from build_filter import create_filter    
 from sdtp import check_valid_spec_return_boolean, InvalidDataException
 
+def _render_table(table_name, table, rows, filter_spec = None):
+    context = {
+        "filter": filter_spec if filter_spec is not None else '',
+        "table": {
+            "name": table_name,
+            "columns": table.schema,
+            "rows": rows[:20] if len(rows) > 20 else rows
+        }
+    }
+    return extended_render('table.html', context)
+
+@app.route('/filter_table', methods=['POST'])
+def filter_table():
+    table_name = request.form.get('table')
+    sdtp_filter_str = request.form.get('filter', None)
+    table = sdtp_server_blueprint.table_server.get_table(table_name)
+    try:
+        sdtp_filter_spec = loads(sdtp_filter_str)
+        if check_valid_spec_return_boolean(sdtp_filter_spec):
+            rows = table.get_filtered_rows(sdtp_filter_spec)
+        else:
+            # bug!  Needs to check in context of table!
+            # Does this go into sdtp or do we do it here...
+            # try here then migrate...
+            flash(f'{sdtp_filter_str} is not a valid filter specification')
+            rows = table.get_filtered_rows()
+    except JSONDecodeError as e:
+        flash(f'{sdtp_filter_str} is not a valid filter specification')
+        rows = table.get_filtered_rows()
+    
+    return _render_table(table_name, table, rows, sdtp_filter_str)
+
+
 @app.route('/view_table')
 def view_table():
     table_name = request.args.get('table')
-    filter = request.args.get('filter')
     table = sdtp_server_blueprint.table_server.get_table(table_name)
-    sdtp_filter_spec = create_filter(filter)
-    if not check_valid_spec_return_boolean(sdtp_filter_spec):
-        sdtp_filter_spec = None
-        filter = ''
+    # sdtp_filter_spec = create_filter(filter)
+    # if not check_valid_spec_return_boolean(sdtp_filter_spec):
+    #     sdtp_filter_spec = None
+    #     filter = ''
 
-    rows = table.get_filtered_rows(sdtp_filter_spec)
+    rows = table.get_filtered_rows()
+    return _render_table(table_name, table, rows)
     if len(rows) > 20: rows = rows[:20]
-    return render_template('table.html',
-                           filter = filter if filter is not None else '',
-                           table = {
-                               "name": table_name, "columns": table.schema, "rows": rows
-                            })
-
-from conf import BUCKET_NAME
+    context = {
+        "filter": sdtp_filter_spec if sdtp_filter_spec is not None else '',
+        "columns": table.schema,
+        "rows": rows
+    }
+    return extended_render('table.html', context)
+                           
+BUCKET_NAME = os.environ['BUCKET_NAME']
 
 from gcs_interface import SDMLStorageBucket
 
@@ -164,17 +238,17 @@ def upload_file():
         return redirect(f"/view_table?table={table_dictionary['name']}")
         
        
-    return render_template('upload_form.html')
+    return extended_render('upload_form.html', {})
     
 
 @app.route("/view_tables")
 def view_tables():
     table_names = sdtp_server_blueprint.table_server.servers.keys()
-    return render_template('view_tables.html', tables=table_names)
+    return extended_render('view_tables.html', {"tables":table_names})
 
 @app.route("/view_base")
 def view_base():
-    return render_template('base.html')
+    return extended_render('base.html', {})
 
 additional_routes =[
     {"url": "/upload", "method": ["GET", "POST"], "description": "File uploader.  If a multipart file is not attached to the POST body, displays a file chooser"},
@@ -197,7 +271,7 @@ def show_routes():
             if not key in page.keys():
                 page[key] = ''
 
-    return render_template('routes.html', pages = pages, keys = keys)
+    return extended_render('routes.html', {"pages": pages, "keys": keys})
 
 
 table_names = bucket.get_all_table_names()

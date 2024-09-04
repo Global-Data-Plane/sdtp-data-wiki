@@ -7,10 +7,15 @@
     </style>
 {% endblock %}
 {% block content %}
-   <h1>Upload a New Data Plane Table</h1>
-    <form action = "/upload" method = "post" enctype="multipart/form-data">   
-        <label for="file">Choose File:</label>
-        <input type="file" name="file" /><br>  
-        <input type = "submit" value="Upload">   
-    </form>   
+   {% if email is defined %}
+    <h1>Upload a New Data Plane Table</h1>
+    <p>
+        Choose a Simple Data Markup Language (SDML) file to upload to the data wiki.
+        The table will be available under <
+    </p>
+        <form action = "/upload" method = "post" enctype="multipart/form-data">   
+            <label for="file">Choose File:</label>
+            <input type="file" name="file" /><br>  
+            <input type = "submit" value="Upload">   
+        </form>   
 {% endblock %}
