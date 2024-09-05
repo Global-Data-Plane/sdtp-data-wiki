@@ -54,6 +54,8 @@ additional_routes =[
   {"url": "/view_base", "method": ["GET", "POST"], "description": "Check out the base template"}
 ]
 
+def _active_login():
+    return "email" in session.keys() and session['email'] is not None
 
 def extended_render(template_name, context):
     '''
@@ -63,7 +65,7 @@ def extended_render(template_name, context):
         template_name: name of the template file
         context: a dictionary of contexts for the template
     '''
-    if "email" in session.keys():
+    if _active_login():
         context["email"] = session["email"]
         context["user"] = session["user"]
     
@@ -236,8 +238,12 @@ def upload_file():
         bucket.upload_table(table_dictionary)
         return redirect(f"/view_table?table={table_dictionary['name']}")
         
-       
-    return extended_render('upload_form.html', {})
+    context = {}
+    if _active_login():
+        current_user = session['user']
+        current_user_tables = [key for key in sdtp_server_blueprint.table_server.servers.keys() if key.startswith(current_user)]
+        context['user_tables'] = current_user_tables
+    return extended_render('upload_form.html', context)
     
 
 @app.route("/view_tables")
