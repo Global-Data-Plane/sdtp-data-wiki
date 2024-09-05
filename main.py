@@ -282,7 +282,8 @@ def show_routes():
 table_names = bucket.get_all_table_names()
 for table_name in table_names:
     table_dict = bucket.get_table_as_dictionary(table_name)
-    sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(table_name, table_dict)
+    key_name = table_name[:-5]
+    sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(key_name, table_dict)
 
 
 if __name__ == '__main__':

@@ -36,7 +36,7 @@
   
   <form action="/filter_table" method="post">
     {% if sample_tables is defined %}
-      <p> Sample Filters for {{ table.name }}</p>
+      <p> Sample Filters for {{ table.name }}.  Clicking on a filter will fill the Filter field with the SDQL query corresponding to the filter; hitting submit will execute it.</p>
       <ul>
         {% for entry in sample_tables %}
           {% set query = entry["query"]|tojson %}
