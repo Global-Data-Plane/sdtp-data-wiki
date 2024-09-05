@@ -74,12 +74,14 @@
     }
     
   </style>
-    {% block head %}
+  {% block head %}
     <link rel="stylesheet" href="style.css" />
     <title>{% block title %}{% endblock %} - My Webpage</title>
-    {% endblock %}
+  {% endblock %}
+  <link rel="shortcut icon" href="{{ url_for('static', filename='B-favicon.ico') }}">
 </head>
 <body>
+  
   <div class="nav">
     <nav>
       <table><tr><td id="n_title", style="padding-right: 20px">Global Data Plane Wiki</td><td> <li><img src="/static/Berkeley_Square_GoldOnBlue.png" width="144" height="144"/></li></td></tr></table>
