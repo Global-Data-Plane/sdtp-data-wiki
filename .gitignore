@@ -172,3 +172,6 @@ app_copy.py
 # don't look at secrets in deployment
 app.yaml
 .vscode/
+*.csv
+/excel
+conf.py
