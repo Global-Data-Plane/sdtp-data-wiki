@@ -93,9 +93,8 @@ app.register_blueprint(sdtp_server_blueprint)
 # from google.cloud import bigquery
 
 app.secret_key = os.environ["APP_SECRET"]
-# root = 'https://data-plane-428318.uw.r.appspot.com/'
-root = 'http://localhost:8080'
-import os
+root = os.environ['ROOT_URL']
+
 
 # Configure OAuth
 oauth = OAuth(app)
