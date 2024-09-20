@@ -175,3 +175,8 @@ app.yaml
 *.csv
 /excel
 conf.py
+
+# Just in case we bring back sdtp for trials...
+sdtp/
+# place where keys are kept locally
+.keys/

@@ -8,4 +8,4 @@ Authlib
 google-cloud-storage
 google-cloud-core
 google-cloud-datastore
-sdtp
+sdtp>=0.2.5

@@ -232,10 +232,18 @@ def upload_file():
             return redirect(request.url)
         try:
             table_dictionary["name"] = f"{session['user']}/{table_dictionary['name']}"
-            sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(table_dictionary["name"], table_dictionary["table"])
+            gcs_table_spec = {
+                "schema":  table_dictionary['table']["schema"],
+                "type": "GCSTable",
+                "bucket": BUCKET_NAME,
+                "blob": f"rowtables/{table_dictionary['name']}.sdml",
+            }
+            # sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(table_dictionary["name"], table_dictionary["table"])
+            sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(table_dictionary["name"], gcs_table_spec)
         except InvalidDataException as e:
             return upload_error(f'Error {e} in creating the table for  {file.filename}')
-        bucket.upload_table(table_dictionary)
+        bucket.upload_table('rowtables', table_dictionary)
+        bucket.upload_table('gcstables', {"name": table_dictionary['name'], "table": gcs_table_spec})
         return redirect(f"/view_table?table={table_dictionary['name']}")
         
     context = {}
@@ -278,12 +286,16 @@ def show_routes():
 
     return extended_render('routes.html', {"pages": pages, "keys": keys})
 
-
-table_names = bucket.get_all_table_names()
+prefix = os.environ.get('TABLE_PREFIX', None)
+table_names = bucket.get_all_table_names(prefix)
 for table_name in table_names:
-    table_dict = bucket.get_table_as_dictionary(table_name)
-    key_name = table_name[:-5]
-    sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(key_name, table_dict)
+    try:
+        table_dict = bucket.get_table_as_dictionary(table_name)
+        first_index = len(prefix) if prefix is not None else 0
+        key_name = table_name[first_index:-5]
+        sdtp_server_blueprint.table_server.add_sdtp_table_from_dictionary(key_name, table_dict)
+    except InvalidDataException as e:
+        pass # need to put logging in
 
 
 if __name__ == '__main__':
