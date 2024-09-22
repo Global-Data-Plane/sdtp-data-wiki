@@ -39,6 +39,7 @@ from authlib.integrations.flask_client import OAuth
 import jwt
 from uploader import make_SDMLTable_from_upload
 from json import loads, JSONDecodeError
+import requests
 
 
 from sdtp import sdtp_server_blueprint
@@ -115,11 +116,21 @@ def login():
     redirect_uri = url_for('authorize', _external=True)
     return google.authorize_redirect(redirect_uri)
 
+@app.route('/logout')
+def logout():
+    if 'google_access_token' in session:
+        requests.post('https://oauth2.googleapis.com/revoke',
+        params={'token': session['google_access_token']},
+        headers = {'content-type': 'application/x-www-form-urlencoded'})
+    session.clear()
+    return redirect(root)
+
 @app.route('/oauth2callback')
 def authorize():
     try:
         # Exchange the authorization code for an access token
         token = google.authorize_access_token()
+        session['google_access_token'] = token['access_token']
         
         id_token = token.get('id_token')
         user_info = jwt.decode(id_token, options={"verify_signature": False})
