@@ -118,10 +118,10 @@ def login():
 
 @app.route('/logout')
 def logout():
-    if 'google_access_token' in session:
-        requests.post('https://oauth2.googleapis.com/revoke',
-        params={'token': session['google_access_token']},
-        headers = {'content-type': 'application/x-www-form-urlencoded'})
+    # if 'google_access_token' in session:
+    #     requests.post('https://oauth2.googleapis.com/revoke',
+    #     params={'token': session['google_access_token']},
+    #     headers = {'content-type': 'application/x-www-form-urlencoded'})
     session.clear()
     return redirect(root)
 
