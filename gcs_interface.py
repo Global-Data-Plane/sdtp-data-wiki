@@ -24,6 +24,17 @@ class SDMLStorageBucket:
       names = [name for name in names if name.startswith(prefix)]
     return names
   
+  def _get_json_blob(self, blob_name):
+    # A utility to get blob blob_name, whioch is a json file
+    # and return it as the Python object.  Worker for get_
+    try:
+      blob = self.bucket.blob(blob_name)
+      json_form = blob.download_as_string()
+      result  = json.loads(json_form)
+      return result
+    except Exception as e:
+      raise InvalidDataException(f'Error {repr(e)} reading  {blob_name}')
+  
   def get_table_as_dictionary(self, table_name):
     '''
     Get table table_name as the dictionary form.  The SDML blob in the bucket should be 
@@ -33,13 +44,7 @@ class SDMLStorageBucket:
     Returns:
       The table as a JSON dictionary
     '''
-    try:
-      blob = self.bucket.blob(table_name)
-      json_form = blob.download_as_string()
-      result  = json.loads(json_form)
-      return result
-    except Exception as e:
-      raise InvalidDataException(f'Error {repr(e)} reading table {table_name}')
+    return self._get_json_blob(table_name)
   
   def upload_table(self, prefix, table_dictionary):
     '''
@@ -56,5 +61,13 @@ class SDMLStorageBucket:
     json_form = json.dumps(table_dictionary['table'])
     blob.upload_from_string(json_form, content_type = 'application/json')
 
+  def get_sdql_samples(self):
+      '''
+      Get the sample SDQL queries, which are stored in 'samples/table_sample_queries.json'
+      '''
+      try:
+        return self._get_json_blob('gcstables/samples/table_sample_queries.json')
+      except InvalidDataException:
+        return {}
 
 

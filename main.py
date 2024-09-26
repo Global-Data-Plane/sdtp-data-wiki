@@ -150,7 +150,14 @@ def cwd():
 from build_filter import create_filter    
 from sdtp import check_valid_spec_return_boolean, InvalidDataException
 
-from table_sample_queries import table_sample_queries
+                           
+BUCKET_NAME = os.environ['BUCKET_NAME']
+
+from gcs_interface import SDMLStorageBucket
+
+bucket = SDMLStorageBucket(BUCKET_NAME)
+
+table_sample_queries = bucket.get_sdql_samples()
 
 def _render_table(table_name, table, rows, filter_spec = None):
     context = {
@@ -200,12 +207,7 @@ def view_table():
     rows = table.get_filtered_rows()
     return _render_table(table_name, table, rows)
     
-                           
-BUCKET_NAME = os.environ['BUCKET_NAME']
 
-from gcs_interface import SDMLStorageBucket
-
-bucket = SDMLStorageBucket(BUCKET_NAME)
 
 def _check_email():
     # A  utility to ensure that only registered users 
